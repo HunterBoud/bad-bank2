@@ -2,6 +2,7 @@
 const mongodb = require('mongodb');
 const MongoClient = mongodb.MongoClient;
 const url = process.env.MONGODB_URI || 'mongodb://localhost:27017';
+const app = 'express';
 let db = null;
 
 const port = process.env.PORT || 3000;
