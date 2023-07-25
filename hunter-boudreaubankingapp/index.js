@@ -4,6 +4,12 @@ const MongoClient = mongodb.MongoClient;
 const url = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 let db = null;
 
+const port = process.env.PORT || 3000;
+app.listen(port, function () {
+  console.log(`Running on port ${port}`);
+});
+
+
 // connect to mongo
 MongoClient.connect(url, {useUnifiedTopology: true}, function(err, client){
     console.log('Connected successfully to db server');
