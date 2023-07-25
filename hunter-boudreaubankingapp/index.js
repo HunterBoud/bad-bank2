@@ -1,130 +1,90 @@
-// const {resolve} = require('path');
-const mongodb = require('mongodb');
-const MongoClient = mongodb.MongoClient;
-const url = process.env.MONGODB_URI || 'mongodb://localhost:27017';
+const express = require('express')
 const app = express();
-let db = null;
-
-const port = process.env.PORT || 3000;
-app.listen(port, function () {
-  console.log(`Running on port ${port}`);
-});
+const cors = require('cors')
+const dal = require('./dal.js')
+// const { checkLoggedIn } = require('./auth.js')
 
 
-// connect to mongo
-MongoClient.connect(url, {useUnifiedTopology: true}, function(err, client){
-    console.log('Connected successfully to db server');
 
-    // connect to myproject database
-    db = client.db('myproject');
-});
 
-// create user account
-function createUser(data){
-    return new Promise((resolve, reject) => {
-        const collection = db.collection('users');
-        const doc = {...data, balance: 0}
-        collection.insertOne(doc, {w:1}, function(err, result){
-            err ? reject(err) : resolve(doc);
-        });
-    })
-}
 
-// check login
-function checkLogin(email, passwordHash) {
-    return new Promise((resolve, reject) => {
-        try {
-            const collection = db
-                .collection('users')
-                .findOne({email, password: passwordHash}, (err, result) => err ? reject(err) : resolve(result));
-        } catch(e) {
+app.use(express.static('public'))
+app.use(cors())
 
-        }
-    })
-}
 
-// all users
-function all(){
-    return new Promise((resolve, reject) => {
-        const customers = db   
-            .collection('users')
-            .find({})
-            .toArray(function(err, docs){
-                err ? reject(err) : resolve(docs);
-            });
-    })
-}
+app.get('/account/create/:name/:email/:password', (req, res)=> {
+    dal.create(req.params.name, req.params.email, req.params.password).
+            then((user) => {
+            console.log(user)
+            res.send(user)
+        })
+})
+app.get('/account/login/:email/:password', (req, res) => {
+    dal.checkLogin(req.params.email, req.params.password)
+      .then((token) => {
+        res.send({ token });
+      })
+      .catch((error) => {
+        console.error('Login failed:', error);
+        res.status(401).send({ error: 'Login failed' });
+      });
+  });
+  
 
-const deleteAllUsers = async () => {
-    return await db.collection('users').deleteMany({});
-}
+// app.post('/account/deposit/:email/:deposit', (req,res)=>{
+//     const newDeposit = parseFloat(req.params.deposit);
 
-const getAccount = async id => {
-            const user = await db.collection('users')
-                .findOne({_id: new mongodb.ObjectID(id)});
-            if (!user) throw new Error('No user found for that id');
+//     dal.makeDeposit(req.params.email, newDeposit)
+//         .then((doc)=> {
+//             // console.log(doc)
+//             res.send({doc})
+//         }).catch((error) => {
+//             console.error('Login failed:', error);
+//             res.status(401).send({ error: 'Deposit failed' });
+//           });
+// })
 
-            return user;
-}
+app.post('/account/deposit/:email/:deposit', (req,res)=>{
+    const parsedDeposit = parseFloat(req.params.deposit).toFixed(2) * -1;
+    const newDeposit = (parsedDeposit * -1)
 
-const updateBalance = async (id, balance) => {
-    const result = await db.collection('users')
-        .updateOne(
-            {_id: new mongodb.ObjectID(id)},
-            {
-                $set: {
-                    balance,
-                },
-            },
-        )
-    return result;
-}
+    dal.makeDeposit(req.params.email, newDeposit)
+        .then((doc)=> {
+            res.send({ balance: doc.balance }); // Sending the updated balance
+        }).catch((error) => {
+            console.error('Deposit failed:', error);
+            res.status(401).send({ error: 'Deposit failed' });
+          });
+})
+app.post('/account/withdraw/:email/:withdraw', (req,res)=>{
+    const parsedWithdraw = parseFloat(req.params.withdraw).toFixed(2);
+    const newWithdraw = (parsedWithdraw * -1)
 
-const withdraw = async (id, amount) => {
-        const account = await getAccount(id);
-        if(!account) throw new Error('Could not find account');
-        const newBalance = (account.balance * 1) - (amount * 1);
-        if (account.balance >= amount) {
-            await updateBalance(id, newBalance);
-            return newBalance;
-        }
-        else throw new Error('Balance lower than withdrawal');
-}
+    dal.makeWithdraw(req.params.email, newWithdraw)
+        .then((doc)=> {
+            res.send({ balance: doc.balance }); // Sending the updated balance
+        }).catch((error) => {
+            console.error('Deposit failed:', error);
+            res.status(401).send({ error: 'Deposit failed' });
+          });
+})
 
-const deposit = async (id, amount) => {
-    const account = await getAccount(id);
-    if(!account) throw new Error('Could not find account');
+app.get('/account/balance/:email/:balance', (req,res)=>{
+    dal.all()
+        .then((docs)=> {
+            console.log(docs)
+            res.send(docs)
+        })
+})
+app.get('/account/all', (req,res)=> {
+    dal.all()
+        .then((docs)=> {
+            console.log(docs)
+            res.send(docs)
+        })
 
-    const newBalance = (account.balance * 1) + (amount * 1)
-    await updateBalance(id, newBalance);
-    return newBalance
-}
+})
 
-const isAdmin = async (id) => {
-    const account = await getAccount(id);
-    if(!account) throw new Error('Could not find account');
-    return account.isAdmin;
-}
-
-const toggleAdmin = async (id) => {
-    const _isAdmin = await isAdmin(id);
-
-    const bool = !_isAdmin;
-
-    const result = await db.collection('users')
-        .updateOne(
-            {_id: new mongodb.ObjectID(id)},
-            {
-                $set: {
-                    isAdmin: bool
-                },
-            },
-        )
-    
-    return bool;
-}
 app.listen(3000, (req, res)=> {
     console.log('Running on port 3000!')
 })
-
-module.exports = {createUser, checkLogin, all, deleteAllUsers, getAccount, withdraw, deposit, isAdmin, toggleAdmin};
