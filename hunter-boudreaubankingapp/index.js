@@ -2,7 +2,7 @@
 const mongodb = require('mongodb');
 const MongoClient = mongodb.MongoClient;
 const url = process.env.MONGODB_URI || 'mongodb://localhost:27017';
-const app = 'express';
+const app = express();
 let db = null;
 
 const port = process.env.PORT || 3000;
@@ -123,5 +123,8 @@ const toggleAdmin = async (id) => {
     
     return bool;
 }
+app.listen(3000, (req, res)=> {
+    console.log('Running on port 3000!')
+})
 
 module.exports = {createUser, checkLogin, all, deleteAllUsers, getAccount, withdraw, deposit, isAdmin, toggleAdmin};
